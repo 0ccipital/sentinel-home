@@ -1,0 +1,32 @@
+# Ollama Modelfile for SentinelHome agent
+#
+# Usage:
+#   ollama create sentinel-qwen -f deploy/ollama-modelfile.txt
+#
+# This creates an Ollama model with parameters pre-tuned for
+# SentinelHome's constrained micro-tasks (Qwen3.5-9B dense).
+
+FROM qwen3.5:9b
+
+# Qwen3.5 recommended: 0.6 for structured tasks, 1.0 for general
+PARAMETER temperature 0.6
+
+# Increase if VRAM allows; 8192 is comfortable on 12 GB+
+PARAMETER num_ctx 8192
+
+# Stop generating after the answer (prevent rambling)
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "\n\n\n"
+
+# Limit response length — most tasks need <100 tokens
+PARAMETER num_predict 200
+
+# Slight repeat penalty to discourage looping
+PARAMETER repeat_penalty 1.1
+
+# Top-p to keep responses focused
+PARAMETER top_p 0.9
+
+# System prompt is set per-request by SentinelHome, but this
+# provides a fallback default
+SYSTEM """You are a network security analyst for a home network monitoring system. You answer questions concisely with a single classification or rating followed by one sentence of explanation. Never respond with JSON. Never use markdown formatting. Keep responses under 50 words."""
