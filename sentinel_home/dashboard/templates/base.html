@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} — SentinelHome</title>
+  <link rel="stylesheet" href="/static/vendor/pico.min.css">
+  <script src="/static/vendor/htmx.min.js"></script>
+  <script src="/static/vendor/htmx-sse.js"></script>
+  <script defer src="/static/vendor/alpine.min.js"></script>
+  {% block head %}{% endblock %}
+  <style>
+    :root {
+      --sh-bg: #0d1117;
+      --sh-surface: #161b22;
+      --sh-border: #30363d;
+      --sh-text: #c9d1d9;
+      --sh-muted: #8b949e;
+      --sh-accent: #58a6ff;
+      --sh-green: #3fb950;
+      --sh-yellow: #d29922;
+      --sh-red: #f85149;
+      --sh-purple: #bc8cff;
+      --sh-orange: #f0883e;
+    }
+    body {
+      background: var(--sh-bg);
+      color: var(--sh-text);
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    /* Top nav */
+    .sh-header {
+      background: var(--sh-surface);
+      border-bottom: 1px solid var(--sh-border);
+      padding: 0 1.5rem;
+      display: flex;
+      align-items: center;
+      height: 52px;
+      gap: 1rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .sh-header h1 {
+      margin: 0;
+      font-size: 1.1rem;
+      color: var(--sh-accent);
+      white-space: nowrap;
+    }
+    .sh-header .version {
+      font-size: 0.65rem;
+      padding: 0.1rem 0.4rem;
+      border-radius: 999px;
+      background: #1a472a;
+      color: var(--sh-green);
+      font-weight: 600;
+    }
+    .sh-nav {
+      display: flex;
+      gap: 0.25rem;
+      margin-left: 1rem;
+      overflow-x: auto;
+    }
+    .sh-nav a {
+      color: var(--sh-muted);
+      text-decoration: none;
+      font-size: 0.8rem;
+      padding: 0.4rem 0.7rem;
+      border-radius: 6px;
+      white-space: nowrap;
+      transition: background 0.15s, color 0.15s;
+    }
+    .sh-nav a:hover { background: var(--sh-border); color: var(--sh-text); }
+    .sh-nav a.active { background: rgba(88,166,255,0.15); color: var(--sh-accent); }
+    .sh-status {
+      margin-left: auto;
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      font-size: 0.75rem;
+    }
+    /* Main content */
+    .sh-main {
+      flex: 1;
+      padding: 1.25rem 1.5rem;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    /* Cards */
+    .sh-card {
+      background: var(--sh-surface);
+      border: 1px solid var(--sh-border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .sh-card h2 {
+      margin: 0 0 0.75rem;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--sh-muted);
+    }
+    /* Grid */
+    .sh-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1rem;
+    }
+    .sh-grid-full { grid-column: 1 / -1; }
+    /* Severity badges */
+    .sev-critical { color: #ff4444; font-weight: 700; }
+    .sev-high     { color: var(--sh-red); font-weight: 600; }
+    .sev-medium   { color: var(--sh-yellow); }
+    .sev-low      { color: var(--sh-green); }
+    .sev-info     { color: var(--sh-muted); }
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 0.12rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+    .badge-ok   { background: #1a472a; color: var(--sh-green); }
+    .badge-warn { background: #3d2800; color: var(--sh-yellow); }
+    .badge-err  { background: #4a1212; color: var(--sh-red); }
+    .badge-info { background: #1c2128; color: var(--sh-muted); }
+    .badge-accent { background: rgba(88,166,255,0.15); color: var(--sh-accent); }
+    /* Action buttons (small inline) */
+    .sh-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.2rem 0.5rem;
+      font-size: 0.7rem;
+      border-radius: 4px;
+      border: 1px solid var(--sh-border);
+      background: var(--sh-surface);
+      color: var(--sh-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .sh-btn:hover { background: var(--sh-border); color: var(--sh-text); }
+    .sh-btn-danger:hover { background: #4a1212; color: var(--sh-red); border-color: var(--sh-red); }
+    .sh-btn-warn:hover { background: #3d2800; color: var(--sh-yellow); border-color: var(--sh-yellow); }
+    .sh-btn-ok:hover { background: #1a472a; color: var(--sh-green); border-color: var(--sh-green); }
+    /* Tables */
+    .sh-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+    .sh-table td, .sh-table th {
+      padding: 0.4rem 0.6rem;
+      text-align: left;
+      border-bottom: 1px solid #21262d;
+    }
+    .sh-table th {
+      color: var(--sh-muted);
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .sh-table tr:hover td { background: rgba(255,255,255,0.02); }
+    /* Stat boxes */
+    .sh-stat {
+      text-align: center;
+      padding: 0.75rem;
+    }
+    .sh-stat .value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .sh-stat .label {
+      font-size: 0.7rem;
+      color: var(--sh-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    /* Utilities */
+    .text-muted { color: var(--sh-muted); }
+    .text-accent { color: var(--sh-accent); }
+    .text-sm { font-size: 0.8rem; }
+    .text-xs { font-size: 0.7rem; }
+    .mono { font-family: 'Cascadia Code', 'Fira Code', monospace; }
+    .nowrap { white-space: nowrap; }
+    .mt-1 { margin-top: 0.5rem; }
+    .mb-1 { margin-bottom: 0.5rem; }
+    .flex { display: flex; }
+    .gap-1 { gap: 0.5rem; }
+    .items-center { align-items: center; }
+    /* Pico overrides for dark dashboard */
+    :where(table) { --pico-border-color: #21262d; }
+    :where(article) { background: var(--sh-surface); border: 1px solid var(--sh-border); }
+    footer {
+      text-align: center;
+      padding: 0.75rem;
+      color: var(--sh-muted);
+      font-size: 0.7rem;
+      border-top: 1px solid var(--sh-border);
+    }
+    /* Expandable detail rows */
+    .expand-row { cursor: pointer; }
+    .expand-row:hover td { background: rgba(88,166,255,0.05) !important; }
+    .expand-detail { display: none; }
+    .expand-detail.open { display: table-row; }
+    .expand-detail td {
+      background: #0d1117 !important;
+      border-left: 3px solid var(--sh-accent);
+      padding: 0.75rem 1rem !important;
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 0.5rem 1.5rem;
+    }
+    .detail-grid dt { color: var(--sh-muted); font-size: 0.7rem; text-transform: uppercase; margin: 0; }
+    .detail-grid dd { margin: 0 0 0.3rem; font-size: 0.82rem; }
+    /* Inline edit forms */
+    .edit-input {
+      background: var(--sh-bg);
+      border: 1px solid var(--sh-border);
+      color: var(--sh-text);
+      padding: 0.3rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      width: 100%;
+    }
+    .edit-input:focus { outline: none; border-color: var(--sh-accent); }
+    .edit-select {
+      background: var(--sh-bg);
+      border: 1px solid var(--sh-border);
+      color: var(--sh-text);
+      padding: 0.3rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+    .edit-select:focus { outline: none; border-color: var(--sh-accent); }
+    .edit-textarea {
+      background: var(--sh-bg);
+      border: 1px solid var(--sh-border);
+      color: var(--sh-text);
+      padding: 0.3rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      width: 100%;
+      min-height: 60px;
+      resize: vertical;
+    }
+    .save-msg { color: var(--sh-green); font-size: 0.7rem; display: inline-block; margin-left: 0.5rem; }
+    /* HTMX loading indicator */
+    .htmx-indicator { opacity: 0; transition: opacity 0.2s; }
+    .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
+    /* Alpine.js cloak (hide until initialized) */
+    [x-cloak] { display: none !important; }
+    /* Agent chat drawer */
+    .chat-fab {
+      position: fixed;
+      bottom: 1.25rem;
+      right: 1.25rem;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--sh-accent);
+      color: #fff;
+      border: none;
+      font-size: 1.3rem;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s, background 0.15s;
+    }
+    .chat-fab:hover { transform: scale(1.08); background: #79b8ff; }
+    .chat-drawer {
+      position: fixed;
+      bottom: 0;
+      right: 0;
+      width: 400px;
+      max-width: 100vw;
+      height: 70vh;
+      max-height: calc(100vh - 60px);
+      background: var(--sh-surface);
+      border: 1px solid var(--sh-border);
+      border-radius: 12px 12px 0 0;
+      z-index: 201;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
+    }
+    .chat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.6rem 0.9rem;
+      border-bottom: 1px solid var(--sh-border);
+      flex-shrink: 0;
+    }
+    .chat-header h3 {
+      margin: 0;
+      font-size: 0.85rem;
+      color: var(--sh-accent);
+    }
+    .chat-header-actions {
+      display: flex;
+      gap: 0.4rem;
+      align-items: center;
+    }
+    .chat-header-actions button {
+      background: none;
+      border: none;
+      color: var(--sh-muted);
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+    }
+    .chat-header-actions button:hover { background: var(--sh-border); color: var(--sh-text); }
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.75rem;
+      scroll-behavior: smooth;
+    }
+    .chat-input-area {
+      border-top: 1px solid var(--sh-border);
+      padding: 0.6rem;
+      flex-shrink: 0;
+    }
+    .chat-input-area form {
+      display: flex;
+      flex-direction: column;
+    }
+    .chat-input-area textarea {
+      width: 100%;
+      box-sizing: border-box;
+      background: var(--sh-bg);
+      border: 1px solid var(--sh-border);
+      color: var(--sh-text);
+      border-radius: 8px;
+      padding: 0.6rem 0.75rem;
+      font-size: 0.9rem;
+      font-family: inherit;
+      resize: none;
+      min-height: 40px;
+      max-height: 120px;
+      line-height: 1.4;
+      overflow-y: auto;
+      margin-bottom: 0.4rem;
+    }
+    .chat-input-area textarea:focus { outline: none; border-color: var(--sh-accent); }
+    .chat-input-area textarea::placeholder { color: var(--sh-muted); }
+    .chat-send-btn {
+      background: var(--sh-accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.55rem 0.9rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      white-space: nowrap;
+      font-weight: 600;
+      transition: background 0.15s;
+      width: 100%;
+    }
+    .chat-send-btn:hover { background: #79b8ff; }
+    .chat-send-btn:disabled { opacity: 0.6; cursor: not-allowed; background: var(--sh-muted); }
+    .chat-send-btn:disabled .chat-send-label { display: none; }
+    .chat-send-btn:disabled .htmx-indicator { display: inline !important; }
+    @media (max-width: 500px) {
+      .chat-drawer { width: 100vw; border-radius: 12px 12px 0 0; }
+    }
+    /* Responsive */
+    @media (max-width: 768px) {
+      .sh-header { padding: 0 0.75rem; }
+      .sh-main { padding: 0.75rem; }
+      .sh-nav { gap: 0.1rem; }
+      .sh-nav a { padding: 0.3rem 0.5rem; font-size: 0.75rem; }
+      .sh-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="sh-header">
+    <h1>SentinelHome</h1>
+    <span class="version">v1.0</span>
+    <nav class="sh-nav">
+      <a href="/" {% if active_page == "overview" %}class="active"{% endif %}>Overview</a>
+      <a href="/devices" {% if active_page == "devices" %}class="active"{% endif %}>Devices</a>
+      <a href="/events" {% if active_page == "events" %}class="active"{% endif %}>Events</a>
+      <a href="/alerts" {% if active_page == "alerts" %}class="active"{% endif %}>Alerts</a>
+      <a href="/wan" {% if active_page == "wan" %}class="active"{% endif %}>WAN</a>
+      <a href="/logs" {% if active_page == "logs" %}class="active"{% endif %}>Logs</a>
+      <a href="/settings" {% if active_page == "settings" %}class="active"{% endif %}>Settings</a>
+    </nav>
+    <button id="sh-refresh-btn" title="Auto-refresh paused — click to refresh"
+            style="display:none;background:none;border:1px solid var(--sh-border);color:var(--sh-accent);border-radius:6px;padding:0.2rem 0.5rem;cursor:pointer;font-size:0.8rem;white-space:nowrap">
+      &#x21bb; Refresh
+    </button>
+    <div class="sh-status"
+         hx-get="/dashboard/partials/status-badge"
+         hx-trigger="load, every 10s"
+         hx-swap="innerHTML">
+      <span class="badge badge-info">loading...</span>
+    </div>
+  </header>
+
+  <main class="sh-main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer>SentinelHome v1.0 — home network security monitor</footer>
+
+  <!-- Agent Chat Drawer (persists across pages) -->
+  <div x-data="chatDrawer()" x-cloak>
+    <!-- Floating action button -->
+    <button class="chat-fab" @click="toggle()" :title="open ? 'Close chat' : 'Ask the Agent'">
+      <span x-show="!open">&#128172;</span>
+      <span x-show="open">&times;</span>
+    </button>
+
+    <!-- Drawer panel -->
+    <div class="chat-drawer" x-show="open" x-transition.opacity.duration.200ms>
+
+      <div class="chat-header">
+        <h3>&#129302; Ask the Agent</h3>
+        <div class="chat-header-actions">
+          <button @click="clearChat()" title="Clear conversation"
+                  hx-post="/dashboard/actions/chat-clear"
+                  hx-target="#chat-messages"
+                  hx-swap="innerHTML">clear</button>
+          <button @click="open = false" title="Close">&times;</button>
+        </div>
+      </div>
+
+      <div class="chat-messages" id="chat-messages">
+      </div>
+
+      <div class="chat-input-area">
+        <form hx-post="/dashboard/actions/chat-send"
+              hx-target="#chat-messages"
+              hx-swap="innerHTML"
+              hx-disabled-elt="find button"
+              hx-indicator="#chat-thinking"
+              @htmx:after-request.camel="onResponse($event)"
+              @submit="onSubmit($event)">
+          <textarea name="question" id="chat-input"
+                    rows="1"
+                    placeholder="Ask about your network..."
+                    @keydown.enter.prevent="if(!$event.shiftKey) $el.closest('form').requestSubmit()"
+                    @input="autoResize($el)"></textarea>
+          <button type="submit" class="chat-send-btn">
+            <span id="chat-thinking" class="htmx-indicator" style="display:none">Thinking...</span>
+            <span class="chat-send-label">Send</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  function chatDrawer() {
+    return {
+      open: false,
+      toggle() {
+        this.open = !this.open;
+        if (this.open) {
+          this.$nextTick(() => {
+            // Load chat history
+            htmx.ajax('GET', '/dashboard/partials/chat-messages', {target: '#chat-messages', swap: 'innerHTML'});
+            document.getElementById('chat-input')?.focus();
+          });
+        }
+      },
+      onSubmit(e) {
+        // Don't clear yet — let htmx send the form first
+      },
+      onResponse(e) {
+        // Clear input after successful send
+        const input = document.getElementById('chat-input');
+        if (input) { input.value = ''; input.style.height = 'auto'; }
+        this.$nextTick(() => this.scrollToBottom());
+      },
+      clearChat() {
+        this.$nextTick(() => this.scrollToBottom());
+      },
+      scrollToBottom() {
+        const el = document.getElementById('chat-messages');
+        if (el) el.scrollTop = el.scrollHeight;
+      },
+      autoResize(el) {
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+      }
+    };
+  }
+
+  // Scroll chat to bottom whenever htmx swaps new content into chat-messages
+  document.addEventListener('htmx:afterSwap', function(e) {
+    if (e.detail.target && e.detail.target.id === 'chat-messages') {
+      e.detail.target.scrollTop = e.detail.target.scrollHeight;
+    }
+  });
+
+  // ---- Auto-refresh pause on user interaction ----
+  // Any scroll or expand-row click inside .sh-main pauses ALL auto-refresh
+  // on the page. Refresh resumes only on navigation or manual refresh click.
+  (function() {
+    var paused = false;
+    var btn = document.getElementById('sh-refresh-btn');
+
+    function pause() {
+      if (paused) return;
+      paused = true;
+      if (btn) btn.style.display = '';
+    }
+
+    function resume() {
+      paused = false;
+      if (btn) btn.style.display = 'none';
+      // Re-trigger all auto-refresh containers to fetch fresh data now
+      document.querySelectorAll('[hx-trigger*="every"]').forEach(function(el) {
+        htmx.trigger(el, 'load');
+      });
+    }
+
+    // Pause: user scrolled inside any content area
+    document.querySelector('.sh-main').addEventListener('scroll', function() {
+      pause();
+    }, true);  // capture phase to catch scrolls on child overflow divs
+
+    // Pause: user clicked an expand row
+    document.querySelector('.sh-main').addEventListener('click', function(e) {
+      if (e.target.closest('.expand-row')) pause();
+    });
+
+    // Cancel auto-refresh requests while paused.
+    // Allow the status badge in the header to keep refreshing.
+    document.addEventListener('htmx:beforeRequest', function(e) {
+      if (!paused) return;
+      var elt = e.detail.elt;
+      // Always allow header status badge and chat
+      if (elt.closest('.sh-header') || elt.closest('.chat-drawer')) return;
+      e.preventDefault();
+    });
+
+    // Refresh button handler
+    if (btn) btn.addEventListener('click', resume);
+  })();
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

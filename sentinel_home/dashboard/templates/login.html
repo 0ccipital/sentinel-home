@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login — SentinelHome</title>
+  <link rel="stylesheet" href="/static/vendor/pico.min.css">
+  <style>
+    :root {
+      --sh-bg: #0d1117;
+      --sh-surface: #161b22;
+      --sh-border: #30363d;
+      --sh-text: #c9d1d9;
+      --sh-muted: #8b949e;
+      --sh-accent: #58a6ff;
+      --sh-red: #f85149;
+    }
+    body {
+      background: var(--sh-bg);
+      color: var(--sh-text);
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-card {
+      background: var(--sh-surface);
+      border: 1px solid var(--sh-border);
+      border-radius: 12px;
+      padding: 2.5rem 2rem 2rem;
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
+    }
+    .login-card h1 {
+      color: var(--sh-accent);
+      font-size: 1.3rem;
+      margin: 0 0 0.3rem;
+    }
+    .login-card .subtitle {
+      color: var(--sh-muted);
+      font-size: 0.85rem;
+      margin-bottom: 1.5rem;
+    }
+    .login-card input[type="password"] {
+      width: 100%;
+      padding: 0.6rem 0.8rem;
+      background: var(--sh-bg);
+      border: 1px solid var(--sh-border);
+      border-radius: 6px;
+      color: var(--sh-text);
+      font-size: 0.95rem;
+      margin-bottom: 1rem;
+      box-sizing: border-box;
+    }
+    .login-card input[type="password"]:focus {
+      border-color: var(--sh-accent);
+      outline: none;
+    }
+    .login-card button {
+      width: 100%;
+      padding: 0.6rem;
+      background: var(--sh-accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .login-card button:hover {
+      opacity: 0.9;
+    }
+    .error-msg {
+      color: var(--sh-red);
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+    .shield-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="shield-icon">&#x1f6e1;</div>
+    <h1>SentinelHome</h1>
+    <p class="subtitle">Enter your dashboard password</p>
+    {% if error %}
+    <p class="error-msg">{{ error }}</p>
+    {% endif %}
+    <form method="post" action="/login">
+      <input type="password" name="password" placeholder="Password" autofocus required>
+      <button type="submit">Sign In</button>
+    </form>
+  </div>
+</body>
+</html>

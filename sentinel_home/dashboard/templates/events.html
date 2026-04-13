@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="sh-card" x-data="{ source: '', severity: '', search: '' }">
+  <div class="flex gap-1 items-center" style="flex-wrap:wrap;margin-bottom:0.75rem">
+    <h2 style="margin:0">Events</h2>
+    <select x-model="source" @change="htmx.trigger('#events-table','refresh')"
+            style="font-size:0.75rem;padding:0.2rem 0.4rem;background:var(--sh-bg);border:1px solid var(--sh-border);color:var(--sh-text);border-radius:4px">
+      <option value="">All Sources</option>
+      <option value="syslog_file">syslog_file</option>
+      <option value="syslog_server">syslog_server</option>
+      <option value="sniff">sniff</option>
+      <option value="nmap">nmap</option>
+      <option value="pihole">pihole</option>
+      <option value="plex">plex</option>
+    </select>
+    <select x-model="severity" @change="htmx.trigger('#events-table','refresh')"
+            style="font-size:0.75rem;padding:0.2rem 0.4rem;background:var(--sh-bg);border:1px solid var(--sh-border);color:var(--sh-text);border-radius:4px">
+      <option value="">All Severities</option>
+      <option value="critical">Critical</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+      <option value="info">Info</option>
+    </select>
+    <input type="text" x-model="search" placeholder="Search messages..."
+           @input.debounce.300ms="htmx.trigger('#events-table','refresh')"
+           style="font-size:0.75rem;padding:0.2rem 0.5rem;background:var(--sh-bg);border:1px solid var(--sh-border);color:var(--sh-text);border-radius:4px;width:200px">
+    <span class="htmx-indicator text-xs text-muted" style="margin-left:0.5rem">loading...</span>
+    <span style="margin-left:auto;display:flex;gap:0.25rem">
+      <a href="/api/v1/export/events?format=csv" class="sh-btn" download>CSV</a>
+      <a href="/api/v1/export/events?format=json" class="sh-btn" download>JSON</a>
+    </span>
+  </div>
+
+  <div id="events-table"
+       hx-get="/dashboard/partials/events-table"
+       hx-trigger="load, refresh, every 10s"
+       hx-swap="innerHTML"
+       hx-include="[x-model]"
+       hx-indicator=".htmx-indicator"
+       hx-vals='js:{source: document.querySelector("[x-model=source]")?.value || "", severity: document.querySelector("[x-model=severity]")?.value || "", search: document.querySelector("[x-model=search]")?.value || ""}'>
+    <p class="text-muted text-sm">Loading...</p>
+  </div>
+</div>
+{% endblock %}

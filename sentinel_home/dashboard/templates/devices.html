@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block head %}
+<script src="/static/vendor/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="sh-card" x-data="{ dtype: '', search: '' }">
+  <div class="flex gap-1 items-center" style="flex-wrap:wrap;margin-bottom:0.75rem">
+    <h2 style="margin:0">Devices</h2>
+    <select x-model="dtype" @change="htmx.trigger('#devices-table','refresh')"
+            style="font-size:0.75rem;padding:0.2rem 0.4rem;background:var(--sh-bg);border:1px solid var(--sh-border);color:var(--sh-text);border-radius:4px">
+      <option value="">All Types</option>
+      <option value="router">Router</option>
+      <option value="ap">AP</option>
+      <option value="switch">Switch</option>
+      <option value="infrastructure">Infrastructure</option>
+      <option value="server">Server</option>
+      <option value="desktop">Desktop</option>
+      <option value="phone">Phone</option>
+      <option value="iot">IoT</option>
+      <option value="media">Media</option>
+    </select>
+    <input type="text" x-model="search" placeholder="Search MAC, IP, vendor, label..."
+           @input.debounce.300ms="htmx.trigger('#devices-table','refresh')"
+           style="font-size:0.75rem;padding:0.2rem 0.5rem;background:var(--sh-bg);border:1px solid var(--sh-border);color:var(--sh-text);border-radius:4px;width:220px">
+    <span class="htmx-indicator text-xs text-muted" style="margin-left:0.5rem">loading...</span>
+    <span style="margin-left:auto;display:flex;gap:0.25rem">
+      <a href="/api/v1/export/devices?format=csv" class="sh-btn" download>CSV</a>
+      <a href="/api/v1/export/devices?format=json" class="sh-btn" download>JSON</a>
+    </span>
+  </div>
+
+  <div id="devices-table"
+       hx-get="/dashboard/partials/devices-table"
+       hx-trigger="load, refresh, every 15s"
+       hx-swap="innerHTML"
+       hx-indicator=".htmx-indicator"
+       hx-vals='js:{dtype: document.querySelector("[x-model=dtype]")?.value || "", search: document.querySelector("[x-model=search]")?.value || ""}'>
+    <p class="text-muted text-sm">Loading...</p>
+  </div>
+</div>
+
+<!-- Device detail modal (loaded via HTMX) -->
+<div id="device-detail" style="display:none; margin-top:1rem" class="sh-card"></div>
+
+<!-- Network Topology -->
+<div class="sh-card" style="margin-top:1rem"
+     hx-get="/dashboard/partials/topology"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+  <h2>Network Topology</h2>
+  <p class="text-muted text-sm">Loading...</p>
+</div>
+{% endblock %}

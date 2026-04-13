@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block head %}
+<script src="/static/vendor/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<!-- Stats row — auto-refreshes -->
+<div hx-get="/dashboard/partials/overview-stats"
+     hx-trigger="load, every 10s"
+     hx-swap="innerHTML"
+     id="stats-row">
+  <div class="sh-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
+    <div class="sh-card sh-stat"><div class="value text-muted">—</div><div class="label">Devices</div></div>
+    <div class="sh-card sh-stat"><div class="value text-muted">—</div><div class="label">Events (1h)</div></div>
+    <div class="sh-card sh-stat"><div class="value text-muted">—</div><div class="label">Alerts</div></div>
+    <div class="sh-card sh-stat"><div class="value text-muted">—</div><div class="label">WAN Blocks (1h)</div></div>
+    <div class="sh-card sh-stat"><div class="value text-muted">—</div><div class="label">Queue</div></div>
+  </div>
+</div>
+
+<div class="sh-grid" style="margin-top:0.5rem">
+  <!-- Event activity chart -->
+  <div class="sh-card sh-grid-full">
+    <h2>Activity (24h)</h2>
+    <div style="height:200px;position:relative">
+      <canvas id="activity-chart"></canvas>
+    </div>
+    <div hx-get="/dashboard/partials/activity-data"
+         hx-trigger="load, every 60s"
+         hx-swap="none"
+         hx-on::after-request="updateChart(event)"></div>
+  </div>
+
+  <!-- Collectors -->
+  <div class="sh-card"
+       hx-get="/dashboard/partials/collectors"
+       hx-trigger="load, every 15s"
+       hx-swap="innerHTML">
+    <h2>Collectors</h2>
+    <p class="text-muted text-sm">Loading...</p>
+  </div>
+
+  <!-- Recent alerts -->
+  <div class="sh-card" id="recent-alerts"
+       hx-get="/dashboard/partials/recent-alerts"
+       hx-trigger="load, every 10s"
+       hx-swap="innerHTML">
+    <h2>Recent Alerts</h2>
+    <p class="text-muted text-sm">Loading...</p>
+  </div>
+
+  <!-- Daily Summary -->
+  <div class="sh-card sh-grid-full"
+       hx-get="/dashboard/partials/daily-summary"
+       hx-trigger="load, every 300s"
+       hx-swap="innerHTML">
+  </div>
+
+  <!-- Network Notes -->
+  <div class="sh-card">
+    <h2>Network Notes</h2>
+    <div id="general-notes"
+         hx-get="/dashboard/partials/general-notes"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+    </div>
+    <form hx-post="/dashboard/actions/add-general-note"
+          hx-target="#general-notes"
+          hx-swap="innerHTML"
+          style="margin-top:0.5rem;display:flex;gap:0.4rem">
+        <input class="edit-input" name="text" placeholder="Add a network note..." style="flex:1">
+        <button class="sh-btn sh-btn-ok" type="submit">Add</button>
+    </form>
+  </div>
+
+  <!-- Recent events — full width -->
+  <div class="sh-card sh-grid-full" id="recent-events"
+       hx-get="/dashboard/partials/recent-events"
+       hx-trigger="load, every 10s"
+       hx-swap="innerHTML">
+    <h2>Event Feed</h2>
+    <p class="text-muted text-sm">Loading...</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let activityChart = null;
+
+function initChart() {
+  const ctx = document.getElementById('activity-chart');
+  if (!ctx) return;
+  activityChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: [],
+      datasets: [
+        { label: 'Events', data: [], backgroundColor: 'rgba(88,166,255,0.6)', borderRadius: 3 },
+        { label: 'WAN Blocks', data: [], backgroundColor: 'rgba(248,81,73,0.4)', borderRadius: 3 },
+        { label: 'Alerts', data: [], backgroundColor: 'rgba(210,153,34,0.7)', borderRadius: 3 },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { color: '#8b949e', boxWidth: 12, font: { size: 11 } } },
+      },
+      scales: {
+        x: {
+          stacked: false,
+          ticks: { color: '#8b949e', font: { size: 10 }, maxRotation: 0 },
+          grid: { color: '#21262d' },
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: '#8b949e', font: { size: 10 } },
+          grid: { color: '#21262d' },
+        },
+      },
+    },
+  });
+}
+
+function updateChart(evt) {
+  try {
+    const data = JSON.parse(evt.detail.xhr.responseText);
+    if (!activityChart) initChart();
+    if (!activityChart) return;
+    activityChart.data.labels = data.labels || [];
+    activityChart.data.datasets[0].data = data.events || [];
+    activityChart.data.datasets[1].data = data.wan_blocks || [];
+    activityChart.data.datasets[2].data = data.alerts || [];
+    activityChart.update('none');
+  } catch(e) { console.debug('chart update error:', e); }
+}
+
+initChart();
+</script>
+{% endblock %}

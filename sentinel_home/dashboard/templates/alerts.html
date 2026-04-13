@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="sh-card" x-data="{ grouped: false }">
+  <div class="flex gap-1 items-center" style="flex-wrap:wrap;margin-bottom:0.75rem">
+    <h2 style="margin:0">Alerts</h2>
+    <button class="sh-btn" @click="grouped = !grouped; $nextTick(() => htmx.trigger(document.getElementById('alerts-content'), 'load'))"
+            x-text="grouped ? 'show all' : 'group'"></button>
+    <button class="sh-btn sh-btn-ok"
+            hx-post="/dashboard/actions/ack-all-alerts"
+            hx-target="#alerts-content"
+            hx-swap="innerHTML"
+            hx-confirm="Mark all alerts as acknowledged?">ack all</button>
+    <a href="/api/v1/export/alerts?format=csv" class="sh-btn" download>CSV</a>
+    <a href="/api/v1/export/alerts?format=json" class="sh-btn" download>JSON</a>
+    <span class="htmx-indicator text-xs text-muted" style="margin-left:0.5rem">loading...</span>
+  </div>
+
+  <div id="alerts-content"
+       :hx-get="grouped ? '/dashboard/partials/alerts-grouped' : '/dashboard/partials/alerts-table'"
+       hx-trigger="load, every 10s"
+       hx-swap="innerHTML"
+       hx-indicator=".htmx-indicator">
+    <p class="text-muted text-sm">Loading...</p>
+  </div>
+</div>
+
+<!-- Findings section -->
+<div class="sh-card" style="margin-top:1rem">
+  <h2>Findings</h2>
+  <div id="findings-content"
+       hx-get="/dashboard/partials/findings-table"
+       hx-trigger="load, every 30s"
+       hx-swap="innerHTML">
+    <p class="text-muted text-sm">Loading...</p>
+  </div>
+</div>
+{% endblock %}

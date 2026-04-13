@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="sh-grid">
+
+  <!-- System info -->
+  <div class="sh-card"
+       hx-get="/dashboard/partials/settings-system"
+       hx-trigger="load"
+       hx-swap="innerHTML">
+    <h2>System</h2>
+    <p class="text-muted text-sm">Loading...</p>
+  </div>
+
+  <!-- Collector config -->
+  <div class="sh-card"
+       hx-get="/dashboard/partials/settings-collectors"
+       hx-trigger="load"
+       hx-swap="innerHTML">
+    <h2>Collectors</h2>
+    <p class="text-muted text-sm">Loading...</p>
+  </div>
+
+  <!-- Agent status -->
+  <div class="sh-card"
+       hx-get="/dashboard/partials/settings-agent"
+       hx-trigger="load, every 30s"
+       hx-swap="innerHTML">
+    <h2>Agent</h2>
+    <p class="text-muted text-sm">Loading...</p>
+  </div>
+
+  <!-- New / unlabelled devices -->
+  <div class="sh-card sh-grid-full"
+       hx-get="/dashboard/partials/settings-new-devices"
+       hx-trigger="load, every 60s"
+       hx-swap="innerHTML"
+       id="new-devices-card">
+  </div>
+
+  <!-- Agent suggestions (unapproved rules) -->
+  <div class="sh-card sh-grid-full"
+       hx-get="/dashboard/partials/agent-suggestions"
+       hx-trigger="load, every 30s"
+       hx-swap="innerHTML"
+       id="agent-suggestions">
+  </div>
+
+  <!-- Rules overview -->
+  <div class="sh-card sh-grid-full"
+       hx-get="/dashboard/partials/settings-rules"
+       hx-trigger="load, every 30s"
+       hx-swap="innerHTML"
+       id="rules-list">
+    <h2>Rules</h2>
+    <p class="text-muted text-sm">Loading...</p>
+  </div>
+
+  <!-- Create rule form -->
+  <div class="sh-card sh-grid-full" x-data="{ open: false }">
+    <h2 @click="open = !open" style="cursor:pointer;margin-bottom:0">
+      Create Rule <span class="text-xs text-muted" x-text="open ? '(click to collapse)' : '(click to expand)'">(click to expand)</span>
+    </h2>
+    <div x-show="open" x-transition style="margin-top:0.75rem">
+      <form hx-post="/dashboard/actions/create-rule"
+            hx-target="#create-rule-result"
+            hx-swap="innerHTML"
+            hx-on::after-request="if(event.detail.successful) setTimeout(() => htmx.trigger('#rules-list', 'load'), 500)"
+            style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem 1rem;max-width:700px">
+        <label class="text-xs text-muted">Name
+          <input class="edit-input" name="name" required placeholder="e.g. high_dns_rate">
+        </label>
+        <label class="text-xs text-muted">Severity
+          <select class="edit-select" name="severity">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
+        </label>
+        <label class="text-xs text-muted" style="grid-column:1/-1">Description
+          <input class="edit-input" name="description" placeholder="What does this rule detect?">
+        </label>
+        <label class="text-xs text-muted">Category
+          <select class="edit-select" name="category">
+            <option value="network">Network</option>
+            <option value="authentication">Authentication</option>
+            <option value="host">Host</option>
+            <option value="process">Process</option>
+          </select>
+        </label>
+        <label class="text-xs text-muted">Action
+          <select class="edit-select" name="action">
+            <option value="alert">Alert</option>
+            <option value="log">Log</option>
+            <option value="investigate">Investigate (queue for agent)</option>
+          </select>
+        </label>
+        <label class="text-xs text-muted">Event type to match
+          <input class="edit-input" name="event_type" placeholder="e.g. fw_wan_block, wifi_assoc">
+        </label>
+        <label class="text-xs text-muted">Threshold (count)
+          <input class="edit-input" type="number" name="threshold" value="1" min="1">
+        </label>
+        <label class="text-xs text-muted">Window (seconds)
+          <input class="edit-input" type="number" name="window_seconds" value="3600" min="60">
+        </label>
+        <label class="text-xs text-muted">Cooldown (seconds)
+          <input class="edit-input" type="number" name="cooldown_seconds" value="300" min="0">
+        </label>
+        <div style="grid-column:1/-1;display:flex;gap:0.5rem;align-items:center;margin-top:0.25rem">
+          <button type="submit" class="sh-btn sh-btn-ok" style="padding:0.3rem 0.8rem">Create Rule</button>
+          <span id="create-rule-result"></span>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Reports -->
+  <div class="sh-card sh-grid-full"
+       hx-get="/dashboard/partials/reports"
+       hx-trigger="load"
+       hx-swap="innerHTML">
+    <h2>Reports</h2>
+    <p class="text-muted text-sm">Loading...</p>
+  </div>
+
+  <!-- Notifications -->
+  <div class="sh-card"
+       hx-get="/dashboard/partials/settings-notifications"
+       hx-trigger="load"
+       hx-swap="innerHTML">
+    <h2>Notifications</h2>
+    <p class="text-muted text-sm">Loading...</p>
+  </div>
+
+  <!-- Password setup -->
+  <div class="sh-card" x-data="{ showForm: false, msg: '' }">
+    <h2>Authentication</h2>
+    <p class="text-sm text-muted mb-1">
+      Dashboard access is currently <strong>{{ "protected" if auth_enabled else "open" }}</strong>.
+    </p>
+    <template x-if="!showForm">
+      <button class="sh-btn" @click="showForm=true">
+        {{ "Change Password" if auth_enabled else "Set Password" }}
+      </button>
+    </template>
+    <template x-if="showForm">
+      <form @submit.prevent="
+        fetch('/dashboard/actions/set-password', {
+          method:'POST',
+          headers:{'Content-Type':'application/x-www-form-urlencoded'},
+          body: new URLSearchParams(new FormData($el))
+        }).then(r=>r.json()).then(d=>{msg=d.message; if(d.ok) showForm=false})
+      " style="max-width:320px">
+        {% if auth_enabled %}
+        <label class="text-xs text-muted">Current password
+          <input type="password" name="current_password" required
+                 style="font-size:0.8rem;padding:0.3rem 0.5rem;background:var(--sh-bg);border:1px solid var(--sh-border);color:var(--sh-text);border-radius:4px;width:100%;margin-top:0.2rem">
+        </label>
+        {% endif %}
+        <label class="text-xs text-muted" style="display:block;margin-top:0.5rem">New password
+          <input type="password" name="new_password" required minlength="4"
+                 style="font-size:0.8rem;padding:0.3rem 0.5rem;background:var(--sh-bg);border:1px solid var(--sh-border);color:var(--sh-text);border-radius:4px;width:100%;margin-top:0.2rem">
+        </label>
+        <div style="margin-top:0.75rem;display:flex;gap:0.5rem;align-items:center">
+          <button type="submit" class="sh-btn sh-btn-ok">Save</button>
+          <button type="button" class="sh-btn" @click="showForm=false">Cancel</button>
+          <span class="text-xs" x-text="msg" :class="msg.includes('error')?'sev-high':'sev-low'"></span>
+        </div>
+      </form>
+    </template>
+  </div>
+
+  <!-- Retention -->
+  <div class="sh-card"
+       hx-get="/dashboard/partials/settings-retention"
+       hx-trigger="load"
+       hx-swap="innerHTML">
+    <h2>Retention</h2>
+    <p class="text-muted text-sm">Loading...</p>
+  </div>
+
+</div>
+{% endblock %}

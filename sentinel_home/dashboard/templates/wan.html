@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block head %}
+<script src="/static/vendor/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="sh-grid">
+  <!-- WAN stats -->
+  <div id="wan-stats"
+       hx-get="/dashboard/partials/wan-stats"
+       hx-trigger="load, every 15s"
+       hx-swap="innerHTML"
+       class="sh-grid-full">
+    <div class="sh-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+      <div class="sh-card sh-stat"><div class="value text-muted">—</div><div class="label">Blocks (1h)</div></div>
+      <div class="sh-card sh-stat"><div class="value text-muted">—</div><div class="label">Blocks (24h)</div></div>
+      <div class="sh-card sh-stat"><div class="value text-muted">—</div><div class="label">Unique Sources</div></div>
+      <div class="sh-card sh-stat"><div class="value text-muted">—</div><div class="label">Top Port</div></div>
+    </div>
+  </div>
+
+  <!-- WAN block trend chart -->
+  <div class="sh-card sh-grid-full">
+    <h2>WAN Blocks (24h)</h2>
+    <div style="height:250px;position:relative">
+      <canvas id="wan-chart"></canvas>
+    </div>
+    <div hx-get="/dashboard/partials/wan-chart-data"
+         hx-trigger="load, every 60s"
+         hx-swap="none"
+         hx-on::after-request="updateWanChart(event)"></div>
+  </div>
+
+  <!-- Block heatmap -->
+  <div class="sh-card sh-grid-full"
+       hx-get="/dashboard/partials/wan-heatmap"
+       hx-trigger="load, every 300s"
+       hx-swap="innerHTML">
+    <h2>Block Heatmap</h2>
+    <p class="text-muted text-sm">Loading...</p>
+  </div>
+
+  <!-- Top blocked sources -->
+  <div class="sh-card" id="wan-top-sources"
+       hx-get="/dashboard/partials/wan-top-sources"
+       hx-trigger="load, every 30s"
+       hx-swap="innerHTML">
+    <h2>Top Blocked Sources</h2>
+    <p class="text-muted text-sm">Loading...</p>
+  </div>
+
+  <!-- Top targeted ports -->
+  <div class="sh-card" id="wan-top-ports"
+       hx-get="/dashboard/partials/wan-top-ports"
+       hx-trigger="load, every 30s"
+       hx-swap="innerHTML">
+    <h2>Top Targeted Ports</h2>
+    <p class="text-muted text-sm">Loading...</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let wanChart = null;
+
+function initWanChart() {
+  const ctx = document.getElementById('wan-chart');
+  if (!ctx) return;
+  wanChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'WAN Blocks',
+        data: [],
+        borderColor: 'rgba(248,81,73,0.8)',
+        backgroundColor: 'rgba(248,81,73,0.15)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+      },
+      scales: {
+        x: {
+          ticks: { color: '#8b949e', font: { size: 10 }, maxRotation: 0 },
+          grid: { color: '#21262d' },
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: '#8b949e', font: { size: 10 } },
+          grid: { color: '#21262d' },
+        },
+      },
+    },
+  });
+}
+
+function updateWanChart(evt) {
+  try {
+    const data = JSON.parse(evt.detail.xhr.responseText);
+    if (!wanChart) initWanChart();
+    if (!wanChart) return;
+    wanChart.data.labels = data.labels || [];
+    wanChart.data.datasets[0].data = data.counts || [];
+    wanChart.update('none');
+  } catch(e) { console.debug('wan chart error:', e); }
+}
+
+initWanChart();
+</script>
+{% endblock %}

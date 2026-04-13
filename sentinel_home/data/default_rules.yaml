@@ -1,0 +1,258 @@
+# Default detection rules — seeded on first run.
+# source: "system" — agent can tune parameters but cannot delete these.
+# All rules start enabled and approved.
+
+rules:
+  # --- Infrastructure health ---
+  - name: unraid_disk_warning
+    description: "SMART warning, reallocated sectors, or array degraded — disk failure imminent."
+    category: host
+    severity: high
+    priority: 0
+    action: alert
+    cooldown_seconds: 3600
+    parameters:
+      match_source: syslog
+      match_patterns:
+        - "smart warning"
+        - "reallocated sector"
+        - "reallocated_sector"
+        - "array degraded"
+        - "disk failure"
+        - "disk disabled"
+        - "disk error"
+
+  # --- Firewall / WAN ---
+  - name: wan_port_scan
+    description: "Same external IP blocked on >10 distinct ports within 60s — external reconnaissance."
+    category: network
+    severity: high
+    priority: 0
+    action: alert
+    cooldown_seconds: 300
+    parameters:
+      match_source: syslog
+      match_event_types:
+        - fw_wan_block
+      window_seconds: 60
+      distinct_ports_threshold: 10
+
+  - name: wan_targeted_attack
+    description: "Repeated WAN blocks from same source on same port — targeted probe or exploit attempt."
+    category: network
+    severity: medium
+    priority: 2
+    action: log
+    cooldown_seconds: 900
+    parameters:
+      match_source: syslog
+      match_event_types:
+        - fw_wan_block
+      window_seconds: 300
+      repeat_threshold: 5
+
+  # --- WiFi client events ---
+  - name: unknown_device
+    description: "MAC not in baseline — new authorized device, guest, or unauthorized access."
+    category: network
+    severity: medium
+    priority: 2
+    action: alert
+    cooldown_seconds: 3600
+    parameters:
+      match_source: sniff
+      check_baseline: true
+
+  - name: wifi_deauth_storm
+    description: "Excessive disassociation events (>10 in 60s) — deauth attack or AP instability."
+    category: network
+    severity: high
+    priority: 0
+    action: alert
+    cooldown_seconds: 300
+    parameters:
+      match_source: syslog
+      window_seconds: 60
+      event_threshold: 10
+      match_event_types:
+        - wifi_disassoc
+        - wifi_deauth
+
+  - name: wifi_auth_failure
+    description: "WiFi authentication failure — wrong PSK, unauthorized client, or attack."
+    category: authentication
+    severity: medium
+    priority: 2
+    action: alert
+    cooldown_seconds: 600
+    parameters:
+      match_source: syslog
+      match_event_types:
+        - wifi_auth_reject
+
+  - name: dns_timeout_anomaly
+    description: "Excessive DNS timeouts for a client — DNS server issue or network problem."
+    category: network
+    severity: low
+    priority: 3
+    action: log
+    cooldown_seconds: 1800
+    parameters:
+      match_source: syslog
+      match_event_types:
+        - dns_timeout
+      window_seconds: 300
+      event_threshold: 20
+
+  # --- Network scanning (nmap) ---
+  - name: new_open_port
+    description: "Port appears in current scan not present in previous — new service or firewall change."
+    category: network
+    severity: high
+    priority: 1
+    action: alert
+    cooldown_seconds: 3600
+    parameters:
+      match_source: nmap
+      compare_previous: true
+
+  # --- Passive sniff (Scapy) ---
+  - name: upnp_port_request
+    description: "Device sent UPnP AddPortMapping — application requesting external port exposure."
+    category: network
+    severity: medium
+    priority: 2
+    action: alert
+    cooldown_seconds: 600
+    parameters:
+      match_source: sniff
+      match_event_types:
+        - upnp_port_map
+
+  - name: arp_conflict
+    description: >-
+      Two different MACs claim same IP within 30s — ARP spoofing or IP conflict.
+      Common false positive on networks with proxy ARP, Docker macvlan, or unmanaged switches.
+    category: network
+    severity: medium
+    priority: 2
+    action: alert
+    cooldown_seconds: 300
+    parameters:
+      match_source: sniff
+      window_seconds: 30
+      ignore_infrastructure: true
+
+  - name: unexpected_smb_traffic
+    description: "SMB traffic between hosts with no baseline SMB relationship — potential lateral movement."
+    category: network
+    severity: medium
+    priority: 1
+    action: alert
+    cooldown_seconds: 600
+    parameters:
+      match_source: sniff
+      match_port: 445
+      check_smb_whitelist: true
+
+  # --- Pi-hole DNS ---
+  - name: suspicious_dns
+    description: "DNS query matches suspicious pattern (DGA domain, known-bad TLD, C2 indicator)."
+    category: network
+    severity: medium
+    priority: 1
+    action: alert
+    cooldown_seconds: 300
+    parameters:
+      match_source: pihole
+      check_threat_patterns: true
+      check_threat_intel: true
+
+  # --- UniFi infrastructure health ---
+  - name: infra_device_offline
+    description: "Infrastructure device (AP/switch/gateway) went offline — connectivity impact likely."
+    category: host
+    severity: high
+    priority: 0
+    action: alert
+    cooldown_seconds: 300
+    parameters:
+      match_source: unifi
+
+  - name: infra_high_cpu
+    description: "Infrastructure device CPU load above 80% — performance degradation possible."
+    category: host
+    severity: medium
+    priority: 2
+    action: log
+    cooldown_seconds: 900
+    parameters:
+      match_source: unifi
+      cpu_threshold: 80
+
+  - name: infra_high_memory
+    description: "Infrastructure device memory above 90% — restart may be needed."
+    category: host
+    severity: medium
+    priority: 2
+    action: alert
+    cooldown_seconds: 900
+    parameters:
+      match_source: unifi
+      memory_threshold: 90
+
+  - name: ap_high_retries
+    description: "AP TX retry rate above 15% — RF interference, overloaded AP, or clients at range edge."
+    category: network
+    severity: medium
+    priority: 2
+    action: log
+    cooldown_seconds: 1800
+    parameters:
+      match_source: unifi
+      retries_threshold: 15
+
+  - name: ssid_config_change
+    description: "WiFi SSID configuration changed — security protocol, SSID name, or band settings modified."
+    category: configuration
+    severity: high
+    priority: 1
+    action: alert
+    cooldown_seconds: 60
+    parameters:
+      match_source: unifi
+
+  - name: firewall_policy_change
+    description: "Firewall zone or policy configuration changed — review for unintended exposure."
+    category: configuration
+    severity: high
+    priority: 1
+    action: alert
+    cooldown_seconds: 60
+    parameters:
+      match_source: unifi
+
+  - name: vpn_client_connect
+    description: "VPN or Teleport client connected — remote access session started."
+    category: authentication
+    severity: info
+    priority: 3
+    action: log
+    cooldown_seconds: 300
+    parameters:
+      match_source: unifi
+
+  # --- Switch health ---
+  - name: switch_state_change
+    description: "Switch state transition detected — provision, adoption, or unexpected restart."
+    category: host
+    severity: medium
+    priority: 2
+    action: log
+    cooldown_seconds: 1800
+    parameters:
+      match_source: syslog
+      match_event_types:
+        - switch_provision
+        - switch_adopt
+        - switch_restart

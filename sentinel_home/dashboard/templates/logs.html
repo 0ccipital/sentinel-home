@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="sh-card" style="padding-bottom:0.5rem">
+  <div class="flex gap-1 items-center" style="flex-wrap:wrap;margin-bottom:0.75rem">
+    <h2 style="margin:0">Live Logs</h2>
+    <span id="log-status" class="badge badge-info">connecting...</span>
+    <span id="log-count" class="badge badge-info">0 lines</span>
+    <label class="text-xs text-muted flex items-center gap-1" style="gap:0.3rem">
+      <input type="checkbox" id="autoscroll" checked style="width:auto;margin:0"> Auto-scroll
+    </label>
+    <label class="text-xs text-muted flex items-center" style="gap:0.3rem">
+      Filter:
+      <input type="text" id="filter-input" placeholder="e.g. ERROR, sniff..."
+             style="background:var(--sh-bg);border:1px solid var(--sh-border);color:var(--sh-text);padding:0.2rem 0.5rem;border-radius:4px;font-size:0.75rem;width:200px">
+    </label>
+    <button onclick="clearLog()" class="sh-btn" style="margin-left:auto">Clear</button>
+  </div>
+
+  <pre id="log-output" style="
+    margin:0;padding:0.75rem;font-family:'Cascadia Code','Fira Code',monospace;
+    font-size:0.72rem;line-height:1.5;max-height:calc(100vh - 220px);
+    overflow-y:auto;white-space:pre-wrap;word-break:break-all;
+    background:var(--sh-bg);border-radius:6px;border:1px solid var(--sh-border);
+  "></pre>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const output = document.getElementById('log-output');
+const statusEl = document.getElementById('log-status');
+const countEl = document.getElementById('log-count');
+const filterInput = document.getElementById('filter-input');
+const autoscrollCb = document.getElementById('autoscroll');
+let lineCount = 0;
+let allLines = [];
+
+const LEVEL_COLORS = {
+  'DEBUG':    '#8b949e',
+  'INFO':     '#58a6ff',
+  'WARNING':  '#d29922',
+  'ERROR':    '#f85149',
+  'CRITICAL': '#ff4444',
+};
+
+function colorize(line) {
+  let color = '#c9d1d9';
+  for (const [level, c] of Object.entries(LEVEL_COLORS)) {
+    if (line.includes(` ${level} `) || line.includes(` ${level}  `)) {
+      color = c;
+      break;
+    }
+  }
+  return `<span style="color:${color}">${escapeHtml(line)}</span>`;
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function matchesFilter(line) {
+  const f = filterInput.value.trim().toLowerCase();
+  if (!f) return true;
+  const terms = f.split(/\s+/);
+  const lower = line.toLowerCase();
+  return terms.every(t => lower.includes(t));
+}
+
+function appendLine(line) {
+  allLines.push(line);
+  if (allLines.length > 5000) allLines = allLines.slice(-3000);
+
+  if (matchesFilter(line)) {
+    output.innerHTML += colorize(line) + '\n';
+    lineCount++;
+    countEl.textContent = `${lineCount} lines`;
+    if (autoscrollCb.checked) {
+      output.scrollTop = output.scrollHeight;
+    }
+  }
+}
+
+function refilter() {
+  output.innerHTML = '';
+  lineCount = 0;
+  for (const line of allLines) {
+    if (matchesFilter(line)) {
+      output.innerHTML += colorize(line) + '\n';
+      lineCount++;
+    }
+  }
+  countEl.textContent = `${lineCount} lines`;
+  if (autoscrollCb.checked) output.scrollTop = output.scrollHeight;
+}
+
+function clearLog() {
+  output.innerHTML = '';
+  allLines = [];
+  lineCount = 0;
+  countEl.textContent = '0 lines';
+}
+
+filterInput.addEventListener('input', () => {
+  clearTimeout(filterInput._debounce);
+  filterInput._debounce = setTimeout(refilter, 200);
+});
+
+fetch('/api/logs/recent?limit=500')
+  .then(r => r.json())
+  .then(data => {
+    for (const line of data.lines) appendLine(line);
+    statusEl.textContent = 'loaded history';
+    statusEl.className = 'badge badge-ok';
+    connectSSE();
+  })
+  .catch(() => {
+    statusEl.textContent = 'error';
+    statusEl.className = 'badge badge-err';
+    connectSSE();
+  });
+
+function connectSSE() {
+  const es = new EventSource('/api/logs/stream');
+  es.addEventListener('log', (e) => appendLine(e.data));
+  es.onopen = () => {
+    statusEl.textContent = 'live';
+    statusEl.className = 'badge badge-ok';
+  };
+  es.onerror = () => {
+    statusEl.textContent = 'reconnecting...';
+    statusEl.className = 'badge badge-warn';
+  };
+}
+</script>
+{% endblock %}
