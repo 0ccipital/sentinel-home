@@ -1,0 +1,54 @@
+# SentinelHome — Docker Compose
+#
+# Deploy on Unraid via the docker-compose plugin.
+#
+# BEFORE FIRST RUN:
+#   1. git clone <repo> /mnt/user/appdata/sentinel-home
+#   2. mkdir -p /mnt/user/sentinel
+#   3. cp config.yaml.example /mnt/user/sentinel/config.yaml  — then edit it
+#   4. cd /mnt/user/appdata/sentinel-home && cp .env.example .env  — fill in secrets
+#   5. docker compose up -d --build
+#
+# ACCESS:
+#   Dashboard:  http://YOUR_HOST_IP:8890/
+#   API docs:   http://YOUR_HOST_IP:8890/docs
+#   Logs:       /mnt/user/sentinel/logs/sentinel.log
+
+services:
+  sentinel-home:
+    build:
+      context: .
+      args:
+        APT_PROXY: ${APT_PROXY:-}
+    container_name: sentinel-home
+    restart: unless-stopped
+
+    # Host networking gives Scapy direct access to eth0 for passive sniffing.
+    # Port 8890 is available on the Unraid host IP without any port mapping.
+    network_mode: host
+
+    # NET_RAW + NET_ADMIN: required for Scapy raw socket capture on eth0.
+    # Do NOT use privileged: true — these two caps are the minimum needed.
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+
+    volumes:
+      # UniFi syslog share — per-device log files (READ ONLY — do not write here)
+      - /mnt/user/syslog:/mnt/syslog:ro
+      # Unraid host syslog — disk warnings, Docker crashes, emhttpd events (READ ONLY)
+      - /var/log:/mnt/hostlog:ro
+      # Sentinel share — DB, config, rotating logs (read-write)
+      - /mnt/user/sentinel:/data:rw
+      # Docker socket — for future Unraid container monitoring (READ ONLY)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+    environment:
+      - CONFIG_PATH=/data/config.yaml
+      # Secrets — set these in .env (never hardcode here)
+      - SENTINEL_API_KEY=${SENTINEL_API_KEY}
+      - OPENWEBUI_API_KEY=${OPENWEBUI_API_KEY}
+      # Optional — leave blank to disable
+      - UNIFI_API_KEY=${UNIFI_API_KEY:-}
+      - PIHOLE_PASSWORD=${PIHOLE_PASSWORD:-}
+      - PLEX_TOKEN=${PLEX_TOKEN:-}

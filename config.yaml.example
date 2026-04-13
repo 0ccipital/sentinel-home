@@ -1,0 +1,103 @@
+# SentinelHome v1.0 Configuration
+# Copy to config.yaml and customize. Secrets should use environment variables.
+# Most settings auto-detect — a minimal config.yaml works out of the box.
+
+network:
+  sniff_interface: auto           # auto-detect first non-loopback interface
+  lan_cidr: auto                  # auto-detect from host IP
+  wan_ip: auto                    # auto-detect via external service
+  # smb_whitelist: []             # IPs where SMB traffic is expected (NAS, file servers)
+  # multi_nic_hosts: []           # IPs with multiple physical NICs (bonded, IPMI)
+
+syslog:
+  mode: auto                      # "auto" tries UDP first, falls back to file
+  udp_port: 514                   # UDP listener port
+  file_dir: /mnt/syslog           # Directory for file-based syslog
+
+nmap:
+  scan_interval_hours: 6
+  ports:                          # Ports to scan on LAN devices
+    - 22    # SSH
+    - 53    # DNS
+    - 80    # HTTP
+    - 443   # HTTPS
+    - 445   # SMB
+    - 3389  # RDP
+    - 8080  # HTTP alt
+    - 8443  # HTTPS alt
+    - 8890  # SentinelHome
+    - 32400 # Plex
+  timeout_seconds: 300
+
+# Optional integrations — leave disabled or set host to "" to skip
+pihole:
+  enabled: false
+  host: ""                        # Pi-hole IP (e.g. "192.168.1.x")
+  password: ""                    # or env: PIHOLE_PASSWORD
+
+unifi:
+  enabled: false
+  host: ""                        # Gateway IP, e.g. "192.168.1.1"
+  api_key: ""                     # or env: UNIFI_API_KEY
+  poll_interval_seconds: 60       # How often to poll clients/devices
+  # verify_ssl: false             # Self-signed cert on most UniFi gateways
+
+plex:
+  enabled: false
+  host: ""                        # Plex server IP
+  port: 32400
+  token: ""                       # or env: PLEX_TOKEN
+
+# Agent (System 2) — optional LLM-powered analysis and rule tuning
+agent:
+  enabled: false
+  provider: openwebui             # openwebui / ollama / openai-compatible
+  url: ""                         # Open WebUI URL, e.g. http://192.168.1.x:8084
+  api_key: ""                     # or env: OPENWEBUI_API_KEY
+  model: ""                       # Actor/critic micro-tasks (e.g. "sentinel-analyst")
+  chat_model: ""                  # Dashboard chat (e.g. "sentinel-chat"), falls back to model
+  investigator_model: ""          # Deep investigation (e.g. "sentinel-investigator"), falls back to model
+  timeout_seconds: 30             # Per-request timeout for LLM calls
+  actor:
+    interval_minutes: 15
+  critic:
+    interval_hours: 12
+    conservatism: moderate         # conservative / moderate / aggressive
+    auto_tuning: true
+    require_consensus: true        # ask twice, apply only if both agree
+    max_rule_changes_per_day: 5
+    min_samples: 20                # minimum rule fires before critic evaluates
+    fp_threshold: 0.4              # false-positive rate that triggers review
+    idle_threshold_days: 14        # disable unused rules after this many days
+
+# Threat intelligence — free lists fetched locally
+threat_intel:
+  enabled: true
+  update_interval_hours: 24
+  sources:
+    - firehol_level1
+    - spamhaus_drop
+    - emerging_threats
+    - known_scanners
+
+# Notifications — optional Apprise URLs for alerts
+# notifications:
+#   urls:
+#     - "tgram://bottoken/ChatID"       # Telegram
+#     - "slack://TokenA/TokenB/TokenC"   # Slack
+#   min_severity: high                   # Only notify on this severity or above
+
+# Data retention
+retention:
+  events_days: 30
+  rollups_days: 90
+  findings_days: 365
+  stale_jobs_days: 30
+
+server:
+  host: 0.0.0.0
+  port: 8890
+  api_key: ""                     # Protects POST endpoints — or env: SENTINEL_API_KEY
+  db_path: /data/sentinel.db      # Container default; override for local dev
+  log_level: INFO
+  # memory_limit_mb: 0            # 0 = auto (1/4 RAM or 8GB minimum)
